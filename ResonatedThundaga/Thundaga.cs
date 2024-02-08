@@ -53,9 +53,10 @@ namespace Thundaga
 
         public override void OnEngineInit()
         {
+
             
             ModConfiguration.OnAnyConfigurationChanged += OnConfigurationChanged;
-            var harmony = new Harmony("ResonatedThundaga");
+            var harmony = new Harmony("Thundaga");
             var config = GetConfiguration();
             WorldPatch.AutoRefreshTick = config.GetValue(AutoRefreshTick);
             UpdateLoop.TickRate = config.GetValue(UpdateRate);
@@ -142,13 +143,18 @@ namespace Thundaga
             Thundaga.Msg("Enqueued Packet for engine");
             ResonitePacketQueue.Add(packet);
         }
-            public static void EnqueueHigh(IConnectorPacket packet) => ResoniteHighPriorityPacketQueue.Add(packet);
+        public static void EnqueueHigh(IConnectorPacket packet)
+        {
+            Thundaga.Msg("Enqueued High Prority Packet for engine");
+            ResoniteHighPriorityPacketQueue.Add(packet);
+        }
         public static void FinishResoniteQueue()
         {
             lock (IntermittentPacketQueue)
             {
                 IntermittentPacketQueue.AddRange(ResoniteHighPriorityPacketQueue);
                 IntermittentPacketQueue.AddRange(ResonitePacketQueue);
+                Thundaga.Msg("Enqueued head Packet for engine");
                 IntermittentPacketQueue.Add(new HeadsetPositionPacket());
                 ResonitePacketQueue.Clear();
                 ResoniteHighPriorityPacketQueue.Clear();
@@ -249,7 +255,7 @@ namespace Thundaga
                 while (___taskQueue.TryDequeue(out var val))
                     PacketManager.AssetTaskQueue.Add(val);
             __result = 0;
-            return false;
+            return true;
         }
     }
 }

@@ -296,6 +296,7 @@ namespace Thundaga
         public static List<CodeInstruction> UpdatePositioningTranspiler(this IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
+
             
             codes[0].opcode = OpCodes.Nop;
             codes[1].operand = _globalPosition;
