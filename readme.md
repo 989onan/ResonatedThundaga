@@ -2,9 +2,7 @@
 This is a mod made by Frozen which I am trying to revive
 Any help is apreciated. I have started to use a publicizer to try to get rid of the weird reflection that was used before the Resonite change.
 *I am also trying to get it to at least run.*
-As of writing this, I am still trying to find some pesky invalid ReversePatch that the error will not tell me where it is.
-Also many other errors like I don't understand what the Transpilers were exactly trying to do. I understand the basic concept but not much more than that
-
+The next step right now is to get the queue to fill and empty with the proper requests from the froox engine
 
 # Thundaga
 An experimental mod for ResoniteModLoader that increases performance by splitting the Unity update loop and the Resonite update loop into separate threads.
