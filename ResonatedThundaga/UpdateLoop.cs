@@ -46,7 +46,7 @@ namespace Thundaga
         }
     }
 
-    [HarmonyPatch(typeof(FrooxEngineRunner))]
+    [HarmonyPatch]
     public static class FrooxEngineRunnerPatch
     {
         public static List<IConnector> Connectors = new List<IConnector>();
@@ -175,7 +175,7 @@ namespace Thundaga
 
         
         [HarmonyPrefix]
-        [HarmonyPatch("Update")]
+        [HarmonyPatch(typeof(FrooxEngineRunner), "Update")]
         private static bool Update(FrooxEngineRunner __instance)
         {
             Thundaga.Msg("Trying to run engine update loop...");
@@ -194,150 +194,154 @@ namespace Thundaga
             }
             else
             {
-                _lastDiagnosticReport--;
-                if (_lastDiagnosticReport <= 0)
-                {
-
-                    _lastDiagnosticReport = 3600;
+                //_lastDiagnosticReport--;
+                //if (_lastDiagnosticReport <= 0)
+                //{
+                //
+                //    _lastDiagnosticReport = 3600;
                     //_refreshAllConnectors = true;
                     //UniLog.Log("Reinitializing...");
                     //UniLog.Log("SkinnedMeshRenderer: " + UnityEngine.Object.FindObjectsOfType<UnityEngine.SkinnedMeshRenderer>().Length);
-                }
+                //}
 
                 try
                 {
 
-                        
-                        var mouse = UnityEngine.InputSystem.Mouse.current;
-                        if (mouse != null) MouseDriverPatch.NewDirectDelta += mouse.delta.ReadValue().ToEngine();
+                    Thundaga.Msg("running asset queues");
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null) MouseDriverPatch.NewDirectDelta += mouse.delta.ReadValue().ToEngine();
 
-                        //___engine.RunUpdateLoop(6.0);
-                        var packets = PacketManager.GetQueuedPackets();
-                        foreach (var packet in packets)
+                    //___engine.RunUpdateLoop(6.0);
+                    Thundaga.Msg("running asset queues1");
+                    var packets = PacketManager.GetQueuedPackets();
+                    Thundaga.Msg("packets number: "+ packets.Count.ToString());
+                    foreach (var packet in packets)
+                    {
+                        try
                         {
-                            try
-                            {
-                                packet.ApplyChange();
-                            }
-                            catch (Exception e)
-                            {
-                                UniLog.Error(e.ToString());
-                            }
+                            packet.ApplyChange();
                         }
-                        var assetTaskQueue = PacketManager.GetQueuedAssetTasks();
-                        foreach (var task in assetTaskQueue)
+                        catch (Exception e)
                         {
-                            try
-                            {
-                                task();
-                            }
-                            catch (Exception e)
-                            {
-                                UniLog.Error(e.ToString());
-                            }
+                            UniLog.Error(e.ToString());
                         }
-                        var assetIntegrator = Engine.Current.AssetManager.Connector as UnityAssetIntegrator;
-                        if (!_renderThreadPointer.HasValue)
-                            _renderThreadPointer =
-                                (IntPtr)assetIntegrator.renderThreadPointer;
-
-                        //if (((SpinQueue<>) AssetIntegratorPatch.RenderThreadQueue
-                        //       .GetValue(assetIntegrator))
-                        //    .Count > 0)
-
-                        GL.IssuePluginEvent(_renderThreadPointer.Value, 0);
-                        assetIntegrator.ProcessQueue(2, false);
-
-                        if (ShouldRefreshAllConnectors)
+                    }
+                    Thundaga.Msg("running asset queues2");
+                    var assetTaskQueue = PacketManager.GetQueuedAssetTasks();
+                    foreach (var task in assetTaskQueue)
+                    {
+                        try
                         {
-                            ShouldRefreshAllConnectors = false;
-                            RefreshAllConnectors();
+                            task();
                         }
-
-                        //prevent people from crashing themselves by setting it to a really low number
-                        if (AutoLocalRefreshTick > 300)
+                        catch (Exception e)
                         {
-                            _autoLocalRefreshTicks++;
-                            if (_autoLocalRefreshTicks > AutoLocalRefreshTick)
-                            {
-                                _autoLocalRefreshTicks = 0;
-                                RefreshAllLocalConnectors();
-                            }
+                            UniLog.Error(e.ToString());
                         }
+                    }
+                    Thundaga.Msg("running asset queues3");
+                    var assetIntegrator = Engine.Current.AssetManager.Connector as UnityAssetIntegrator;
+                    if (!_renderThreadPointer.HasValue)
+                        _renderThreadPointer =
+                            (IntPtr)assetIntegrator.renderThreadPointer;
 
-                        /*var focusedWorld = ___engine.WorldManager.FocusedWorld;
-                        if (focusedWorld != null)
+                    //if (((SpinQueue<>) AssetIntegratorPatch.RenderThreadQueue
+                    //       .GetValue(assetIntegrator))
+                    //    .Count > 0)
+                    Thundaga.Msg("running asset queues4");
+                    GL.IssuePluginEvent(_renderThreadPointer.Value, 0);
+                    assetIntegrator.ProcessQueue(2, false);
+
+                    if (ShouldRefreshAllConnectors)
+                    {
+                        ShouldRefreshAllConnectors = false;
+                        RefreshAllConnectors();
+                    }
+                    Thundaga.Msg("running asset queues5");
+                    //prevent people from crashing themselves by setting it to a really low number
+                    if (AutoLocalRefreshTick > 300)
+                    {
+                        _autoLocalRefreshTicks++;
+                        if (_autoLocalRefreshTicks > AutoLocalRefreshTick)
                         {
-                            var num = ___engine.InputInterface.VR_Active;
-                            var headOutput1 = num ? ___vrOutputRoot : ___screenOutputRoot;
-                            var headOutput2 = num ? ___screenOutputRoot : ___vrOutputRoot;
-                            if (headOutput2 != null &&
-                                headOutput2.gameObject.activeSelf)
-                                headOutput2.gameObject.SetActive(false);
-                            if (!headOutput1.gameObject.activeSelf)
-                                headOutput1.gameObject.SetActive(true);
-                            headOutput1.UpdatePositioning(focusedWorld);
-                            Vector3 vector3;
-                            Quaternion quaternion;
-                            if (focusedWorld.OverrideEarsPosition)
-                            {
-                                vector3 = focusedWorld.LocalUserEarsPosition.ToUnity();
-                                quaternion = focusedWorld.LocalUserEarsRotation.ToUnity();
-                            }
-                            else
-                            {
-                                var cameraRoot = headOutput1.CameraRoot;
-                                vector3 = cameraRoot.position;
-                                quaternion = cameraRoot.rotation;
-                            }
-
-                            var transform = ___audioListener.transform;
-                            transform.position = vector3;
-                            transform.rotation = quaternion;
-                            ___engine.WorldManager.GetWorlds(____worlds);
-                            var transform1 = headOutput1.transform;
-                            foreach (var world in ____worlds)
-                            {
-                                if (world.Focus != World.WorldFocus.Overlay &&
-                                    world.Focus != World.WorldFocus.PrivateOverlay) continue;
-                                var transform2 = ((WorldConnector)world.Connector).WorldRoot.transform;
-                                var userGlobalPosition = world.LocalUserGlobalPosition;
-                                var userGlobalRotation = world.LocalUserGlobalRotation;
-                                transform2.transform.position = transform1.position - userGlobalPosition.ToUnity();
-                                transform2.transform.rotation = transform1.rotation * userGlobalRotation.ToUnity();
-                                transform2.transform.localScale = transform1.localScale;
-                            }
-
-                            ____worlds.Clear();
+                            _autoLocalRefreshTicks = 0;
+                            RefreshAllLocalConnectors();
+                        }
+                    }
+                    Thundaga.Msg("finished asset queues");
+                    var focusedWorld = __instance._frooxEngine.WorldManager.FocusedWorld;
+                    if (focusedWorld != null)
+                    {
+                        var num = __instance._frooxEngine.InputInterface.VR_Active;
+                        var headOutput1 = num ? __instance.VROutput : __instance.ScreenOutput;
+                        var headOutput2 = num ? __instance.ScreenOutput : __instance.VROutput;
+                        if (headOutput2 != null &&
+                            headOutput2.gameObject.activeSelf)
+                            headOutput2.gameObject.SetActive(false);
+                        if (!headOutput1.gameObject.activeSelf)
+                            headOutput1.gameObject.SetActive(true);
+                        headOutput1.UpdatePositioning(focusedWorld);
+                        Vector3 vector3;
+                        Quaternion quaternion;
+                        if (focusedWorld.OverrideEarsPosition)
+                        {
+                            vector3 = focusedWorld.LocalUserEarsPosition.ToUnity();
+                            quaternion = focusedWorld.LocalUserEarsRotation.ToUnity();
+                        }
+                        else
+                        {
+                            var cameraRoot = headOutput1.CameraRoot;
+                            vector3 = cameraRoot.position;
+                            quaternion = cameraRoot.rotation;
                         }
 
-                        if (focusedWorld != ____lastFocusedWorld)
+                        var transform = __instance._audioListener.transform;
+                        transform.position = vector3;
+                        transform.rotation = quaternion;
+                        __instance._frooxEngine.WorldManager.GetWorlds(__instance._worlds);
+                        var transform1 = headOutput1.transform;
+                        foreach (var world in __instance._worlds)
                         {
-                            __instance.DynamicGI.UpdateDynamicGI();
-                            //DynamicGIManager.ScheduleDynamicGIUpdate(true);
-                            ____lastFocusedWorld = focusedWorld;
-                            __instance.StartCoroutine(UpdateDynamicGIDelayed(__instance));
+                            if (world.Focus != World.WorldFocus.Overlay &&
+                                world.Focus != World.WorldFocus.PrivateOverlay) continue;
+                            var transform2 = ((WorldConnector)world.Connector).WorldRoot.transform;
+                            var userGlobalPosition = world.LocalUserGlobalPosition;
+                            var userGlobalRotation = world.LocalUserGlobalRotation;
+                            transform2.transform.position = transform1.position - userGlobalPosition.ToUnity();
+                            transform2.transform.rotation = transform1.rotation * userGlobalRotation.ToUnity();
+                            transform2.transform.localScale = transform1.localScale;
                         }
 
-                        var num1 = ___engine.InputInterface.VR_Active ? 1 : 0;
-                        var lastVractive = ____lastVRactive;
-                        var num2 = lastVractive.GetValueOrDefault() ? 1 : 0;
-                        if (!(num1 == num2 & lastVractive.HasValue))
+                        __instance._worlds.Clear();
+                    }
+
+                    if (focusedWorld != __instance._lastFocusedWorld)
+                    {
+                        __instance.DynamicGI.UpdateDynamicGI();
+                        __instance._lastFocusedWorld = focusedWorld;
+                        __instance.StartCoroutine(nameof(DynamicGIManager.ScheduleDynamicGIUpdate), true);
+                    }
+
+                    var num1 = __instance._frooxEngine.InputInterface.VR_Active ? 1 : 0;
+                    var lastVractive = __instance._lastVRactive;
+                    var num2 = lastVractive.GetValueOrDefault() ? 1 : 0;
+                    if (!(num1 == num2 & lastVractive.HasValue))
+                    {
+                        __instance._lastVRactive = __instance._frooxEngine.InputInterface.VR_Active;
+                        if (__instance._lastVRactive.Value)
                         {
-                            ____lastVRactive = ___engine.InputInterface.VR_Active;
-                            if (____lastVRactive.Value)
-                            {
-                                QualitySettings.lodBias = 3.8f;
-                                QualitySettings.vSyncCount = 0;
-                                QualitySettings.maxQueuedFrames = 0;
-                            }
-                            else
-                            {
-                                QualitySettings.lodBias = 2f;
-                                QualitySettings.vSyncCount = 1;
-                                QualitySettings.maxQueuedFrames = 2;
-                            }
-                        }*/
+                            QualitySettings.lodBias = 3.8f;
+                            QualitySettings.vSyncCount = 0;
+                            QualitySettings.maxQueuedFrames = 0;
+                        }
+                        else
+                        {
+                            QualitySettings.lodBias = 2f;
+                            QualitySettings.vSyncCount = 1;
+                            QualitySettings.maxQueuedFrames = 2;
+                        }
+                    }
+                    Thundaga.Msg("finished VR queues");
                 }
                 catch (Exception ex)
                 {
@@ -359,12 +363,12 @@ namespace Thundaga
                 */
 
             }
-            return true;
+            return false;
         }
         
         //[HarmonyReversePatch]
-        //[HarmonyPatch("ShutDown")]
-        private static void ShutDown(FrooxEngineRunner instance) =>
+        //[HarmonyPatch(typeof(FrooxEngineRunner), "ShutDown")]
+        public static void ShutDown(FrooxEngineRunner __instance) =>
             throw new NotImplementedException();
     }
     

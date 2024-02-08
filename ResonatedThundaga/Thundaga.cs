@@ -137,8 +137,12 @@ namespace Thundaga
         public static List<IConnectorPacket> IntermittentPacketQueue = new List<IConnectorPacket>();
         public static List<Action> AssetTaskQueue = new List<Action>();
 
-        public static void Enqueue(IConnectorPacket packet) => ResonitePacketQueue.Add(packet);
-        public static void EnqueueHigh(IConnectorPacket packet) => ResoniteHighPriorityPacketQueue.Add(packet);
+        public static void Enqueue(IConnectorPacket packet)
+        {
+            Thundaga.Msg("Enqueued Packet for engine");
+            ResonitePacketQueue.Add(packet);
+        }
+            public static void EnqueueHigh(IConnectorPacket packet) => ResoniteHighPriorityPacketQueue.Add(packet);
         public static void FinishResoniteQueue()
         {
             lock (IntermittentPacketQueue)
@@ -198,8 +202,8 @@ namespace Thundaga
             }
             return false;
         }
-        //[HarmonyReversePatch]
-        //[HarmonyPatch(typeof(ImplementableComponent<IConnector>), "set_Connector")]
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(ImplementableComponent<IConnector>), "set_Connector")]
         public static void set_Connector(ImplementableComponent<IConnector> instance, IConnector connector)
         {
             throw new NotImplementedException();

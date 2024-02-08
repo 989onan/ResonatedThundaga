@@ -41,14 +41,14 @@ namespace Thundaga
     public class WorldConnectorPatch
     {
         public static FieldInfo Focus = typeof(World).GetField("_focus", AccessTools.all);
-        //[HarmonyReversePatch]
-        //[HarmonyPatch(typeof(WorldConnector), "Initialize")]
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(WorldConnector), "Initialize")]
         public static void Initialize(WorldConnector instance, World owner) => throw new NotImplementedException();
-        //[HarmonyReversePatch]
-        //[HarmonyPatch(typeof(WorldConnector), "ChangeFocus")]
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(WorldConnector), "ChangeFocus")]
         public static void ChangeFocus(WorldConnector instance, World.WorldFocus focus) => throw new NotImplementedException();
-        //[HarmonyReversePatch]
-        //[HarmonyPatch(typeof(WorldConnector), "Destroy")]
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(WorldConnector), "Destroy")]
         public static void Destroy(WorldConnector instance) => throw new NotImplementedException();
         [HarmonyPrefix]
         [HarmonyPatch(typeof(WorldConnector), "Initialize")]

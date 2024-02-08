@@ -98,15 +98,15 @@ namespace Thundaga.Packets
     [HarmonyPatch]
     public static class SlotConnectorPatches
     {
-        //[HarmonyPrefix]
-        //[HarmonyPatch(typeof(SlotConnector), "ApplyChanges")]
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(SlotConnector), "ApplyChanges")]
         private static bool ApplyChanges(SlotConnector __instance)
         {
             PacketManager.Enqueue(__instance.GetPacket());
             return false;
         }
-        //[HarmonyPrefix]
-        //[HarmonyPatch(typeof(SlotConnector), "Destroy")]
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(SlotConnector), "Destroy")]
         private static bool Destroy(SlotConnector __instance, bool destroyingWorld)
         {
             PacketManager.Enqueue(__instance.GetDestroyPacket(destroyingWorld));
@@ -114,8 +114,8 @@ namespace Thundaga.Packets
         }
 
 
-        //[HarmonyReversePatch]
-        //[HarmonyPatch("UpdateLayer")]
+        [HarmonyReversePatch]
+        [HarmonyPatch(typeof(SlotConnector), "UpdateLayer")]
         public static void UpdateLayer(SlotConnector instance) => 
             throw new NotImplementedException();
 

@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using B83.Win32;
 using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
@@ -297,6 +296,7 @@ namespace Thundaga
         public static List<CodeInstruction> UpdatePositioningTranspiler(this IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
+            
             codes[0].opcode = OpCodes.Nop;
             codes[1].operand = _globalPosition;
             codes[3].opcode = OpCodes.Nop;
@@ -330,7 +330,7 @@ namespace Thundaga
             for (var i = 0; i < codes.Count; i++)
             {
                 var code = codes[i];
-                if (code.opcode != OpCodes.Callvirt || !code.operand.ToString().Contains("get_delta")) continue;
+                if (code.opcode != OpCodes.Callvirt || !code.operand.ToString().Contains("get_deltaTime")) continue;
                 codes[i - 1].opcode = OpCodes.Nop;
                 codes[i].opcode = OpCodes.Call;
                 codes[i].operand = method;
