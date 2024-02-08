@@ -1,13 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using BaseX;
+using Elements.Core;
+using Elements.Assets;
 using FrooxEngine;
 using HarmonyLib;
+using System;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
-using UnityNeos;
+using UnityFrooxEngineRunner;
 
 namespace Thundaga.Packets
 {
@@ -39,9 +38,19 @@ namespace Thundaga.Packets
             //_parentConnector = parent?.Connector;
             _shouldUpdateParent = parent?.Connector != SlotConnectorInfo.ParentConnector.GetValue(connector) && parent != null;
             if (owner.ActiveSelf_Field.GetWasChangedAndClear()) _active = owner.ActiveSelf_Field.Value;
-            if (owner.Position_Field.GetWasChangedAndClear()) _position = owner.Position_Field.Value.ToUnity();
-            if (owner.Rotation_Field.GetWasChangedAndClear()) _rotation = owner.Rotation_Field.Value.ToUnity();
-            if (owner.Scale_Field.GetWasChangedAndClear()) _scale = owner.Scale_Field.Value.ToUnity();
+
+            if (owner.Position_Field.GetWasChangedAndClear())
+            {
+                _position = owner.Position_Field.Value.ToUnity();
+            }
+            if (owner.Rotation_Field.GetWasChangedAndClear())
+            {
+                _rotation = owner.Rotation_Field.Value.ToUnity();
+            }
+            if (owner.Scale_Field.GetWasChangedAndClear()) 
+            {
+                _scale = owner.Scale_Field.Value.ToUnity();
+            }
         }
         public override void ApplyChange()
         {
@@ -58,7 +67,7 @@ namespace Thundaga.Packets
         private void UpdateData()
         {
             if (_active.HasValue) _connector.GeneratedGameObject.SetActive(_active.Value);
-            var transform = (Transform)SlotConnectorInfo.Transform.GetValue(_connector);
+            var transform = (UnityEngine.Transform)SlotConnectorInfo.Transform.GetValue(_connector);
             if (_position.HasValue) transform.localPosition = _position.Value;
             if (_rotation.HasValue) transform.localRotation = _rotation.Value;
             if (_scale.HasValue) transform.localScale = _scale.Value;
@@ -86,43 +95,47 @@ namespace Thundaga.Packets
             Transform = typeof(SlotConnector).GetField("_transform", AccessTools.all);
         }
     }
-    [HarmonyPatch(typeof(SlotConnector))]
+    [HarmonyPatch]
     public static class SlotConnectorPatches
     {
-        [HarmonyPatch("ApplyChanges")]
-        [HarmonyPrefix]
+        //[HarmonyPrefix]
+        //[HarmonyPatch(typeof(SlotConnector), "ApplyChanges")]
         private static bool ApplyChanges(SlotConnector __instance)
         {
             PacketManager.Enqueue(__instance.GetPacket());
             return false;
         }
-        [HarmonyPatch("Destroy")]
-        [HarmonyPrefix]
+        //[HarmonyPrefix]
+        //[HarmonyPatch(typeof(SlotConnector), "Destroy")]
         private static bool Destroy(SlotConnector __instance, bool destroyingWorld)
         {
             PacketManager.Enqueue(__instance.GetDestroyPacket(destroyingWorld));
             return false;
         }
-        [HarmonyPatch("UpdateLayer")]
-        [HarmonyReversePatch]
+
+
+        //[HarmonyReversePatch]
+        //[HarmonyPatch("UpdateLayer")]
         public static void UpdateLayer(SlotConnector instance) => 
             throw new NotImplementedException();
 
-        [HarmonyPatch("UpdateParent")]
         [HarmonyReversePatch]
+        [HarmonyPatch(typeof(SlotConnector), "UpdateParent")]
         public static void UpdateParent(SlotConnector instance) => 
             throw new NotImplementedException();
 
-        [HarmonyPatch("Destroy")]
         [HarmonyReversePatch]
+        [HarmonyPatch(typeof(SlotConnector), "Destroy")]
         public static void DestroyOriginal(SlotConnector instance, bool destroyingWorld) =>
             throw new NotImplementedException();
+            
     }
     [HarmonyPatch(typeof(Slot))]
     public static class SlotPatches
     {
-        [HarmonyPatch("set_Connector")]
+
         [HarmonyReversePatch]
+        [HarmonyPatch("set_Connector")]
         public static void set_Connector(Slot instance, ISlotConnector connector) =>
             throw new NotImplementedException();
         

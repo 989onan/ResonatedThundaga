@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Thundaga": {
+      "commandName": "Executable",
+      "executablePath": "D:\\SteamLibrary\\steamapps\\common\\Resonite\\Resonite.exe",
+      "commandLineArgs": "-LoadAssembly Libraries\\ResoniteModLoader.dll -ForceSyncConflictingCloudRecords"
+    }
+  }
+}

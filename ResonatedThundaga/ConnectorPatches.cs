@@ -4,76 +4,96 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using BaseX;
+using B83.Win32;
+using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using UnityEngine;
-using UnityNeos;
+using UnityFrooxEngineRunner;
 using Component = FrooxEngine.Component;
 using MeshRenderer = FrooxEngine.MeshRenderer;
 using SkinnedMeshRenderer = FrooxEngine.SkinnedMeshRenderer;
 
 namespace Thundaga
 {
-    [HarmonyPatch(typeof(ComponentBase<Component>))]
+    [HarmonyPatch]
     public static class ComponentBasePatch
     {
-        [HarmonyPatch("InternalRunStartup", MethodType.Normal)]
         [HarmonyReversePatch]
-        public static void InternalRunStartup(ComponentBase<Component> instance) => 
+        [HarmonyPatch(typeof(ComponentBase<Component>), "InternalRunStartup")]
+        public static void InternalRunStartup(ComponentBase<Component> instance) =>
             throw new NotImplementedException();
-
-        [HarmonyPatch("InternalRunDestruction", MethodType.Normal)]
         [HarmonyReversePatch]
+        [HarmonyPatch(typeof(ComponentBase<Component>), "InternalRunDestruction")]
         public static void InternalRunDestruction(ComponentBase<Component> instance) =>
             throw new NotImplementedException();
     }
+
+
+
+    //Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the mesh renderer patch.
+    /*
     [HarmonyPatch(typeof(MeshRendererConnectorBase<MeshRenderer, UnityEngine.MeshRenderer>))]
     public class MeshRendererConnectorPatch
     {
-        [HarmonyPatch("set_meshWasChanged")]
-        [HarmonyReversePatch]
-        public static void set_meshWasChanged(
-            MeshRendererConnectorBase<MeshRenderer, UnityEngine.MeshRenderer> instance, bool value) =>
-            throw new NotImplementedException();
         [HarmonyPatch("ApplyChanges")]
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
             IEnumerable<CodeInstruction> instructions)
         {
+
+            Thundaga.Msg("patching MeshRendererConnectorBase for SkinnedMeshRendererConnector implementation");
+
+            return transpilerCodeMeshConnectorGeneric.ApplyChangesTranspilerGeneric(instructions);
+
+
+        }
+    }
+
+    public static class transpilerCodeMeshConnectorGeneric{
+        public static IEnumerable<CodeInstruction> ApplyChangesTranspilerGeneric(
+            IEnumerable<CodeInstruction> instructions)
+        {
+
             //remove GetWasChangedAndClear methods to prevent thread errors
             var codes = new List<CodeInstruction>(instructions);
             codes.Reverse();
-            for (var a = 0; a < 3; a++)
-            {
-                for (var i = 0; i < codes.Count; i++)
-                    if (codes[i].opcode == OpCodes.Brfalse_S)
-                    {
-                        for (var h = 0; h < 6; h++)
-                        {
-                            var code = codes[i + h];
-                            code.opcode = OpCodes.Nop;
-                            code.operand = null;
-                        }
-                        break;
-                    }
-            }
+            
             for (var i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode != OpCodes.Beq_S) continue;
-                for (var h = 0; h < 6; h++)
+                //this makes more sense, since instead of looking for the op code, look for the operand calling GetWasChangedAndClear and remove and and surrounding till it doesn't cause errors.
+                //- @989onan
+                if (codes[i].opcode != OpCodes.Callvirt || !codes[i].operand.ToString().Contains("GetWasChangedAndClear")) continue;
+
+                for (var h = 0; h < 3; h++)
                 {
                     var code = codes[i + h];
                     code.opcode = OpCodes.Nop;
                     code.operand = null;
                 }
-                break;
+                    
             }
+
+
+            //get rid of renderer enabled to prevent thread errors.
+            for (var i = 0; i < codes.Count; i++){
+                if (codes[i].opcode != OpCodes.Callvirt || !codes[i].operand.ToString().Contains("Renderer::set_Enabled")) continue;
+
+                for(var h = 0; h< 5; h++)
+                {
+                    var code = codes[i + h];
+                    code.opcode = OpCodes.Nop;
+                    code.operand = null;
+
+                }
+
+            }
+
+            //get rid of setting mesh was changed to prevent thread errors? 
             for (var i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode != OpCodes.Call ||
-                    !codes[i].operand.ToString().Contains("set_meshWasChanged")) continue;
-                for (var h = 0; h < 7; h++)
+                if (codes[i].opcode != OpCodes.Call || !codes[i].operand.ToString().Contains("set_meshWasChanged")) continue;
+                for (var h = 0; h < 9; h++)
                 {
                     var code = codes[i + h];
                     code.opcode = OpCodes.Nop;
@@ -82,14 +102,23 @@ namespace Thundaga
                 break;
             }
             codes.Reverse();
-            //replace generic set with our method
+
+
+
+            //replace generic set with our method - Fro Zen
+            //this 
+
             var index = codes.IndexOf(codes.Where(i =>
                 i.opcode == OpCodes.Callvirt && i.operand.ToString().Contains("AddComponent")).ToList()[1]);
             codes[index].operand = typeof(MeshGenericFix).GetMethod("SetMeshRendererPatch");
             codes[index].opcode = OpCodes.Call;
             codes.Insert(index, new CodeInstruction(OpCodes.Ldarg_0));
+            Thundaga.Msg("Patched Mesh renderer connector.");
+
             return codes;
         }
+
+
     }
 
     public static class MeshGenericFix
@@ -104,7 +133,7 @@ namespace Thundaga
     [HarmonyPatch(typeof(SkinnedMeshRendererConnector))]
     public static class SkinnedMeshRendererConnectorPatchA
     {
-        [HarmonyPatch("ApplyChanges")]
+        [HarmonyPatch("OnUpdateRenderer")]
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
             IEnumerable<CodeInstruction> instructions)
@@ -127,7 +156,8 @@ namespace Thundaga
             }
             codes.Reverse();
             //replace buggy blendshape code
-            var index = codes.LastIndexOf(codes.Last(i => i.opcode == OpCodes.Call && i.operand.ToString().Contains("get_Owner")));
+            //&& i.operand.ToString().Contains("get_Owner")
+            var index = codes.LastIndexOf(codes.Last(i => i.opcode == OpCodes.Ldloc_2));
             codes[index].operand = typeof(SkinnedMeshRendererConnectorPatchA).GetMethod("DoBlendShapes");
             var index2 = codes.LastIndexOf(codes.Last(i => i.opcode == OpCodes.Call && i.operand.ToString().Contains("SendBoundsUpdated"))) - 1;
             for (var i = index + 1; i < index2; i++)
@@ -135,40 +165,40 @@ namespace Thundaga
                 codes[i].opcode = OpCodes.Nop;
                 codes[i].operand = null;
             }
-            /*
-            for (var i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode != OpCodes.Ldloc_S ||
-                    !codes[i].operand.ToString().Contains("14")) continue;
-                codes[i].opcode = OpCodes.Ldarg_0;
-                codes[i].operand = null;
-                codes[i + 1].operand = typeof(SkinnedMeshRendererConnectorPatchA).GetMethod("GetBlendShapeCount");
-                /*
-                var insertCodes = new CodeInstruction[]
-                {
-                    new CodeInstruction(OpCodes.Ldarg_0),
-                    new CodeInstruction(OpCodes.Callvirt,
-                        typeof(SkinnedMeshRendererConnectorPatchA).GetMethod("GetBlendShapeCount")),
-                    new CodeInstruction(OpCodes.Stloc_S, (byte)20)
-                };
-                codes.InsertRange(i, insertCodes);
-                */
-            /*
-                break;
-            }
-            */
+            
+            //for (var i = 0; i < codes.Count; i++)
+            //{
+            //    if (codes[i].opcode != OpCodes.Ldloc_S ||
+            //        !codes[i].operand.ToString().Contains("14")) continue;
+            //    codes[i].opcode = OpCodes.Ldarg_0;
+            //    codes[i].operand = null;
+            //    codes[i + 1].operand = typeof(SkinnedMeshRendererConnectorPatchA).GetMethod("GetBlendShapeCount");
+            //   
+            //    var insertCodes = new CodeInstruction[]
+            //    {
+            //        new CodeInstruction(OpCodes.Ldarg_0),
+            //        new CodeInstruction(OpCodes.Callvirt,
+            //            typeof(SkinnedMeshRendererConnectorPatchA).GetMethod("GetBlendShapeCount")),
+            //        new CodeInstruction(OpCodes.Stloc_S, (byte)20)
+            //    };
+            //    codes.InsertRange(i, insertCodes);
+            //    
+            //
+            //    break;
+            //}
+            
+            Thundaga.Msg("patched SkinnedMeshRendererConnector");
             return codes;
         }
-        public static int GetBlendShapeCount(SkinnedMeshRendererConnector instance) =>
-            instance.MeshRenderer.sharedMesh.blendShapeCount;
 
-        public static void DoBlendShapes(SkinnedMeshRendererConnector instance)
+        public static int GetBlendShapeCount(ref SkinnedMeshRendererConnector __instance) => __instance.MeshRenderer.sharedMesh.blendShapeCount;
+        public static bool DoBlendShapes(SkinnedMeshRendererConnector instance)
         {
-            if (instance == null) return;
+            if (instance == null) return false ;
             var renderer = instance.MeshRenderer;
-            if (renderer == null) return;
+            if (renderer == null) return false;
             var mesh = renderer.sharedMesh;
-            if (mesh == null) return;
+            if (mesh == null) return false;
             var count = mesh.blendShapeCount;
             var weights = instance.Owner.BlendShapeWeights.ToList();
             var weightsCount = weights.Count;
@@ -178,108 +208,54 @@ namespace Thundaga
                 {
                     renderer.SetBlendShapeWeight(i, weightsCount > i ? weights[i] : 0);
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
                     break;
                 }
             }
+            return false;
         }
     }
+
+    //Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the skinned mesh renderer patch.
     [HarmonyPatch(typeof(MeshRendererConnectorBase<SkinnedMeshRenderer, UnityEngine.SkinnedMeshRenderer>))]
     public static class SkinnedMeshRendererConnectorPatchB
     {
-        [HarmonyPatch("set_meshWasChanged")]
-        [HarmonyReversePatch]
-        public static void set_meshWasChanged(
-            MeshRendererConnectorBase<SkinnedMeshRenderer, UnityEngine.SkinnedMeshRenderer> instance, bool value) =>
-            throw new NotImplementedException();
         [HarmonyPatch("ApplyChanges")]
         [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
+        public static IEnumerable<CodeInstruction> OnUpdateRendererTranspiler(
             IEnumerable<CodeInstruction> instructions)
         {
-            //remove GetWasChangedAndClear methods to prevent thread errors
-            var codes = new List<CodeInstruction>(instructions);
-            codes.Reverse();
-            for (var a = 0; a < 3; a++)
-            {
-                for (var i = 0; i < codes.Count; i++)
-                {
-                    if (codes[i].opcode != OpCodes.Brfalse_S) continue;
-                    for (var h = 0; h < 6; h++)
-                    {
-                        var code = codes[i + h];
-                        code.opcode = OpCodes.Nop;
-                        code.operand = null;
-                    }
-                    break;
-                }
-            }
-            for (var i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode != OpCodes.Beq_S) continue;
-                for (var h = 0; h < 6; h++)
-                {
-                    var code = codes[i + h];
-                    code.opcode = OpCodes.Nop;
-                    code.operand = null;
-                }
-                break;
-            }
-            for (var i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode != OpCodes.Call ||
-                    !codes[i].operand.ToString().Contains("set_meshWasChanged")) continue;
-                for (var h = 0; h < 7; h++)
-                {
-                    var code = codes[i + h];
-                    code.opcode = OpCodes.Nop;
-                    code.operand = null;
-                }
-                break;
-            }
-            codes.Reverse();
-            //replace generic set with our method
-            var index = codes.IndexOf(codes.Where(i =>
-                i.opcode == OpCodes.Callvirt && i.operand.ToString().Contains("AddComponent")).ToList()[1]);
-            codes[index].operand = typeof(MeshGenericFix).GetMethod("SetMeshRendererPatch");
-            codes[index].opcode = OpCodes.Call;
-            codes.Insert(index, new CodeInstruction(OpCodes.Ldarg_0));
-            return codes;
+
+            Thundaga.Msg("patching MeshRendererConnectorBase for SkinnedMeshRendererConnector implementation");
+
+            return transpilerCodeMeshConnectorGeneric.ApplyChangesTranspilerGeneric(instructions);
         }
-    }
-    [HarmonyPatch(typeof(MeshConnector))]
+    }*/
+    [HarmonyPatch]
     public static class MeshConnectorPatch
     {
-        [HarmonyPatch("Upload")]
+        [HarmonyPatch(typeof(MeshConnector), "Upload")]
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> UploadTranspiler(
             IEnumerable<CodeInstruction> instructions) =>
             instructions.RemoveDestroyImmediate();
         
-        [HarmonyPatch("Destroy")]
+        [HarmonyPatch(typeof(MeshConnector), "Destroy")]
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> DestroyTranspiler(
             IEnumerable<CodeInstruction> instructions) =>
             instructions.RemoveDestroyImmediate();
     }
-    [HarmonyPatch(typeof(TextureConnector))]
+    [HarmonyPatch]
     public static class TextureConnectorPatch
     {
-        [HarmonyPatch("Destroy")]
+        [HarmonyPatch(typeof(TextureConnector), "Destroy")]
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> DestroyTranspiler(
-            IEnumerable<CodeInstruction> instructions) =>
-            instructions.RemoveDestroyImmediate();
-    }
-    [HarmonyPatch(typeof(Texture3DConnector))]
-    public static class Texture3DConnectorPatch
-    {
-        [HarmonyPatch("Destroy")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> DestroyTranspiler(
-            IEnumerable<CodeInstruction> instructions) =>
-            instructions.RemoveDestroyImmediate();
+            IEnumerable<CodeInstruction> instructions)
+        { return instructions.RemoveDestroyImmediate().RemoveDestroyImmediate().RemoveDestroyImmediate(); }
+            
     }
     [HarmonyPatch(typeof(MaterialConnector))]
     public static class MaterialConnectorPatch
@@ -334,26 +310,6 @@ namespace Thundaga
             return codes;
         }
     }
-    [HarmonyPatch(typeof(UnityAssetIntegrator))]
-    public static class AssetIntegratorPatch
-    {
-        public static MethodInfo ProcessQueueMethod;
-        public static FieldInfo RenderThreadPointer;
-        public static FieldInfo RenderThreadQueue;
-        static AssetIntegratorPatch()
-        {
-            ProcessQueueMethod = typeof(UnityAssetIntegrator).GetMethods(AccessTools.all)
-                .First(i => i.Name.Contains("ProcessQueue") && i.GetParameters().Length == 2);
-            RenderThreadPointer = typeof(UnityAssetIntegrator).GetField("renderThreadPointer", AccessTools.all);
-            RenderThreadQueue = typeof(UnityAssetIntegrator).GetField("renderThreadQueue", AccessTools.all);
-        }
-        /*
-        [HarmonyPatch("ProcessQueue", typeof(double), typeof(bool))]
-        [HarmonyReversePatch]
-        public static int ProcessQueue(UnityAssetIntegrator instance, double maxMilliseconds, bool renderThread) =>
-            throw new NotImplementedException("utterly and completely retarded");
-            */
-    }
     [HarmonyPatch(typeof(MouseDriver))]
     public static class MouseDriverPatch
     {
@@ -387,16 +343,30 @@ namespace Thundaga
             return codes;
         }
     }
+
+    //FIXED I THINK - 989onan
     public static class DestroyImmediateRemover
     {
         public static IEnumerable<CodeInstruction> OnReadyTranspiler(
             IEnumerable<CodeInstruction> instructions) =>
             instructions.RemoveDestroyImmediate(false).RemoveDestroyImmediate().RemoveDestroyImmediate();
 
-        public static IEnumerable<CodeInstruction> Transpiler(
+
+        [HarmonyPatch(typeof(RenderTextureConnector), "Unload")]
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> Transpiler1(
             IEnumerable<CodeInstruction> instructions) =>
             instructions.RemoveDestroyImmediate();
+
+        [HarmonyPatch(typeof(TextureConnector), "SetTextureFormatDX11Native", typeof(TextureConnector.TextureFormatData))]
+        [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> TranspilerTwice(
+            IEnumerable<CodeInstruction> instructions) =>
+            instructions.RemoveDestroyImmediate(false).RemoveDestroyImmediate(false);
+
+        [HarmonyPatch(typeof(TextureConnector), "GenerateUnityTextureFromOpenGL", typeof(TextureConnector.TextureFormatData))]
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> TranspilerTwice2(
             IEnumerable<CodeInstruction> instructions) =>
             instructions.RemoveDestroyImmediate(false).RemoveDestroyImmediate(false);
         public static List<CodeInstruction> RemoveDestroyImmediate(this IEnumerable<CodeInstruction> instructions, bool hasOperand = true)

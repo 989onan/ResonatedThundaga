@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ResonatedThundaga</RootNamespace>
+    <AssemblyName>ResonatedThundaga</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
+    <!-- linux steam -->
+    <ResonitePath Condition="Exists('$(HOME)/.steam/steam/steamapps/common/Resonite/')">$(HOME)/.steam/steam/steamapps/common/Resonite/</ResonitePath>
+    <!-- windows steam -->
+    <ResonitePath Condition="Exists('C:\Program Files (x86)\Steam\steamapps\common\Resonite\')">C:\Program Files (x86)\Steam\steamapps\common\Resonite\</ResonitePath>
+    <ResonitePath Condition="Exists('D:\SteamLibrary\steamapps\common\Resonite\')">D:\SteamLibrary\steamapps\common\Resonite\</ResonitePath>
+    <!-- windows standalone -->
+    <ResonitePath Condition="Exists('C:\Resonite\app\')">C:\Resonite\app\</ResonitePath>
+    <ProjectGuid>{906B0EFD-FD35-4B3A-972B-F7F38A7894D2}</ProjectGuid>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Elements.Assets">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/Elements.Assets.dll</HintPath>
+    </Reference>
+    <Reference Include="CloudX">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/LiteDB.dll</HintPath>
+    </Reference>
+    <Reference Include="Elements.Core">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/Elements.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityFrooxEngineRunner">
+      <HintPath>../UnityFrooxEngineRunner_publicized.dll</HintPath>
+    </Reference>
+    <Reference Include="FrooxEngine">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/FrooxEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VRModule">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/UnityEngine.VRModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/Unity.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/UnityEngine.ParticleSystemModule.dll</HintPath>
+    </Reference>
+    <Reference Include="ResoniteModLoader">
+      <HintPath>$(ResonitePath)ResoniteModLoader.dll</HintPath>
+      <HintPath Condition="Exists('$(ResonitePath)Libraries/ResoniteModLoader.dll')">$(ResonitePath)Libraries/ResoniteModLoader.dll</HintPath>
+    </Reference>
+    <Reference Include="HarmonyLib">
+      <HintPath>$(ResonitePath)0Harmony.dll</HintPath>
+      <HintPath Condition="Exists('$(ResonitePath)rml_libs/0Harmony.dll')">$(ResonitePath)rml_libs/0Harmony.dll</HintPath>
+    </Reference>
+    <Reference Include="NativeGraphics">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/NativeGraphics.NET.dll</HintPath>
+    </Reference>
+    <Reference Include="AssimpNet">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/AssimpNet.dll</HintPath>
+    </Reference>
+    <Reference Include="BepuUtilities">
+      <HintPath>$(ResonitePath)Resonite_Data/Managed/BepuUtilities.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ConnectorPatches.cs" />
+    <Compile Include="GenericComponentPacket.cs" />
+    <Compile Include="HeadConnectorPacket.cs" />
+    <Compile Include="SlotConnector.cs" />
+    <Compile Include="Thundaga.cs" />
+    <Compile Include="UpdateLoop.cs" />
+    <Compile Include="WorldConnector.cs" />
+    <None Include="packages.config" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>copy "$(TargetDir)\$(TargetFileName)" "$(ResonitePath)\rml_mods\"</PostBuildEvent>
+  </PropertyGroup>
+</Project>

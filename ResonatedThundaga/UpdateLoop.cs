@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using BaseX;
+using Elements.Core;
 using FrooxEngine;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.XR;
-using UnityNeos;
+using UnityFrooxEngineRunner;
 using System.Threading;
 using System.Threading.Tasks;
 using Debug = UnityEngine.Debug;
@@ -30,7 +30,8 @@ namespace Thundaga
             while (!Shutdown)
             {
                 Engine.Current.RunUpdateLoop();
-                PacketManager.FinishNeosQueue();
+                Thundaga.Msg("Engine running (check UpdateLoop for source of the spam)");
+                PacketManager.FinishResoniteQueue();
                 dateTime = dateTime.AddTicks((long) (10000000.0 * tickRate));
                 var timeSpan = dateTime - DateTime.UtcNow;
                 if (timeSpan.TotalMilliseconds > 0.0)
@@ -54,7 +55,7 @@ namespace Thundaga
         private static IntPtr? _renderThreadPointer;
         public static bool ShouldRefreshAllConnectors;
         private static readonly FieldInfo LocalSlots = typeof(World).GetField("_localSlots", AccessTools.all);
-        public static ThreadPriority NeosThreadPriority = ThreadPriority.Normal;
+        public static ThreadPriority ResoniteThreadPriority = ThreadPriority.Normal;
         public static int AutoLocalRefreshTick = 1800;
         private static int _autoLocalRefreshTicks;
 
@@ -65,7 +66,7 @@ namespace Thundaga
             UniLog.Log($"Refreshed {count} components");
             //prevent updating removed connectors
             PacketManager.IntermittentPacketQueue.Clear();
-            PacketManager.NeosPacketQueue.Clear();
+            PacketManager.ResonitePacketQueue.Clear();
         }
         private static void RefreshAllLocalConnectors() =>
             Engine.Current.WorldManager.Worlds.Sum(RefreshLocalConnectorsForWorld);
@@ -131,7 +132,7 @@ namespace Thundaga
             var toRemove = new List<IConnector>();
             foreach (var connector in Connectors)
             {
-                if (connector.Owner != null && !connector.Owner.IsDestroyed && !connector.Owner.IsRemoved) continue;
+                if (connector.Owner != null && !connector.Owner.IsRemoved) continue;
                 try
                 {
                     connector.Destroy(false);
@@ -157,11 +158,11 @@ namespace Thundaga
                 con.Initialize();
                 if (con is MeshRendererConnector mesh)
                 {
-                    MeshRendererConnectorPatch.set_meshWasChanged(mesh, true);
+                    mesh.meshWasChanged = true;
                 }
                 if (con is SkinnedMeshRendererConnector smesh)
                 {
-                    SkinnedMeshRendererConnectorPatchB.set_meshWasChanged(smesh, true);
+                    smesh.meshWasChanged = true;
                 }
                 con.ApplyChanges();
             }
@@ -171,40 +172,21 @@ namespace Thundaga
             }
         }
 
-        [HarmonyPatch("Update")]
+
+        
         [HarmonyPrefix]
-        private static bool Update(FrooxEngineRunner __instance, ref bool ___engineInitialized,
-            ref bool ___shutdownEnvironment, ref Engine ___engine, ref Stopwatch ___stopwatch,
-            ref Stopwatch ____externalStopwatch, ref SystemInfoConnector ___systemInfoConnector,
-            ref Stopwatch ____framerateStopwatch, ref int ____framerateCounter, ref SpinQueue<Action> ___actions,
-            ref bool? ____lastVRactive, ref List<World> ____worlds, ref World ____lastFocusedWorld,
-            ref bool ___updateDynamicGI, ref bool ___updateDynamicGIimmediate, ref float ___lastDynamicGIupdate,
-            ref AudioListener ___audioListener, ref HeadOutput ___vrOutputRoot, ref HeadOutput ___screenOutputRoot)
+        [HarmonyPatch("Update")]
+        private static bool Update(FrooxEngineRunner __instance)
         {
-            if (!___engineInitialized)
+            Thundaga.Msg("Trying to run engine update loop...");
+            if (!__instance.Engine.IsInitialized)
                 return false;
-            UpdateLoop.Shutdown = ___shutdownEnvironment;
-            if (___shutdownEnvironment)
-            {
-                UniLog.Log("Shutting down environment");
-                try
-                {
-                    ___engine?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    UniLog.Error("Exception disposing the engine:\n" + ___engine);
-                }
-                ___engine = null;
-                QuitApplication(__instance);
-                return false;
-            }
-            if (!_startedUpdating)
+            if (!__instance.IsInitialized)
             {
                 var updateLoop = new Thread(UpdateLoop.Update)
                 {
                     Name = "Update Loop",
-                    Priority = NeosThreadPriority,
+                    Priority = ResoniteThreadPriority,
                     IsBackground = false
                 };
                 updateLoop.Start();
@@ -215,52 +197,19 @@ namespace Thundaga
                 _lastDiagnosticReport--;
                 if (_lastDiagnosticReport <= 0)
                 {
-                    
+
                     _lastDiagnosticReport = 3600;
                     //_refreshAllConnectors = true;
                     //UniLog.Log("Reinitializing...");
                     //UniLog.Log("SkinnedMeshRenderer: " + UnityEngine.Object.FindObjectsOfType<UnityEngine.SkinnedMeshRenderer>().Length);
                 }
 
-                ___stopwatch.Restart();
-                ____externalStopwatch.Stop();
                 try
                 {
-                    if (___engine != null)
-                    {
-                        SystemInfoConnectorPatch.ExternalUpdateTime.SetValue(___systemInfoConnector,
-                            ____externalStopwatch.ElapsedMilliseconds * (1f / 1000f));
-                        if (!____framerateStopwatch.IsRunning)
-                        {
-                            ____framerateStopwatch.Restart();
-                        }
-                        else
-                        {
-                            ++____framerateCounter;
-                            var elapsedMilliseconds = ____framerateStopwatch.ElapsedMilliseconds;
-                            if (elapsedMilliseconds >= 500L)
-                            {
-                                if (___systemInfoConnector != null)
-                                    SystemInfoConnectorPatch.FPS.SetValue(___systemInfoConnector, ____framerateCounter /
-                                        (elapsedMilliseconds * (1f / 1000f)));
-                                ____framerateCounter = 0;
-                                ____framerateStopwatch.Restart();
-                            }
-                        }
 
-                        if (___systemInfoConnector != null)
-                        {
-                            SystemInfoConnectorPatch.RenderTime.SetValue(___systemInfoConnector,
-                                !XRStats.TryGetGPUTimeLastFrame(out var gpuTimeLastFrame) ? -1f
-                                    : gpuTimeLastFrame * (1f / 1000f));
-                            SystemInfoConnectorPatch.ImmediateFPS.SetValue(___systemInfoConnector,
-                                1f / Time.unscaledDeltaTime);
-                        }
-                        ___engine.InputInterface.UpdateWindowResolution(new int2(Screen.width,
-                            Screen.height));
-
+                        
                         var mouse = UnityEngine.InputSystem.Mouse.current;
-                        if (mouse != null) MouseDriverPatch.NewDirectDelta += mouse.delta.ReadValue().ToNeos();
+                        if (mouse != null) MouseDriverPatch.NewDirectDelta += mouse.delta.ReadValue().ToEngine();
 
                         //___engine.RunUpdateLoop(6.0);
                         var packets = PacketManager.GetQueuedPackets();
@@ -290,14 +239,14 @@ namespace Thundaga
                         var assetIntegrator = Engine.Current.AssetManager.Connector as UnityAssetIntegrator;
                         if (!_renderThreadPointer.HasValue)
                             _renderThreadPointer =
-                                (IntPtr) AssetIntegratorPatch.RenderThreadPointer.GetValue(assetIntegrator);
-                        /*
-                        if (((SpinQueue<>) AssetIntegratorPatch.RenderThreadQueue
-                                .GetValue(assetIntegrator))
-                            .Count > 0)
-                            */
+                                (IntPtr)assetIntegrator.renderThreadPointer;
+
+                        //if (((SpinQueue<>) AssetIntegratorPatch.RenderThreadQueue
+                        //       .GetValue(assetIntegrator))
+                        //    .Count > 0)
+
                         GL.IssuePluginEvent(_renderThreadPointer.Value, 0);
-                        AssetIntegratorPatch.ProcessQueueMethod.Invoke(assetIntegrator, new object[] {2, false});
+                        assetIntegrator.ProcessQueue(2, false);
 
                         if (ShouldRefreshAllConnectors)
                         {
@@ -316,7 +265,7 @@ namespace Thundaga
                             }
                         }
 
-                        var focusedWorld = ___engine.WorldManager.FocusedWorld;
+                        /*var focusedWorld = ___engine.WorldManager.FocusedWorld;
                         if (focusedWorld != null)
                         {
                             var num = ___engine.InputInterface.VR_Active;
@@ -351,7 +300,7 @@ namespace Thundaga
                             {
                                 if (world.Focus != World.WorldFocus.Overlay &&
                                     world.Focus != World.WorldFocus.PrivateOverlay) continue;
-                                var transform2 = ((WorldConnector) world.Connector).WorldRoot.transform;
+                                var transform2 = ((WorldConnector)world.Connector).WorldRoot.transform;
                                 var userGlobalPosition = world.LocalUserGlobalPosition;
                                 var userGlobalRotation = world.LocalUserGlobalRotation;
                                 transform2.transform.position = transform1.position - userGlobalPosition.ToUnity();
@@ -364,7 +313,8 @@ namespace Thundaga
 
                         if (focusedWorld != ____lastFocusedWorld)
                         {
-                            FrooxEngineRunner.UpdateDynamicGI(true);
+                            __instance.DynamicGI.UpdateDynamicGI();
+                            //DynamicGIManager.ScheduleDynamicGIUpdate(true);
                             ____lastFocusedWorld = focusedWorld;
                             __instance.StartCoroutine(UpdateDynamicGIDelayed(__instance));
                         }
@@ -387,30 +337,15 @@ namespace Thundaga
                                 QualitySettings.vSyncCount = 1;
                                 QualitySettings.maxQueuedFrames = 2;
                             }
-                        }
-                    }
+                        }*/
                 }
                 catch (Exception ex)
                 {
                     UniLog.Error(ex.ToString());
                     Debug.LogError(ex.ToString());
-                    ___engine = null;
-                    QuitApplication(__instance);
+                    ShutDown(__instance);
                 }
-
-                ____externalStopwatch.Restart();
-                ___stopwatch.Stop();
-                if (___updateDynamicGI && (___updateDynamicGIimmediate || Time.time - ___lastDynamicGIupdate > 1.0))
-                {
-                    __instance.GlobalProbe.RenderProbe();
-                    DynamicGI.UpdateEnvironment();
-                    ___updateDynamicGI = false;
-                    ___updateDynamicGIimmediate = false;
-                    ___lastDynamicGIupdate = Time.time;
-                }
-
-                while (___actions.TryDequeue(out var val1))
-                    val1();
+                // }
                 //this would be a memory leak...
                 //but it doesn't seem to be used anywhere...
                 /*
@@ -422,21 +357,19 @@ namespace Thundaga
                         __instance.UnityLog(val2.msg);
                 }
                 */
+
             }
-            return false;
+            return true;
         }
-
-        [HarmonyPatch("UpdateDynamicGIDelayed")]
-        [HarmonyReversePatch]
-        private static IEnumerator UpdateDynamicGIDelayed(FrooxEngineRunner instance) =>
-            throw new NotImplementedException();
-
-        [HarmonyPatch("QuitApplication")]
-        [HarmonyReversePatch]
-        private static void QuitApplication(FrooxEngineRunner instance) =>
+        
+        //[HarmonyReversePatch]
+        //[HarmonyPatch("ShutDown")]
+        private static void ShutDown(FrooxEngineRunner instance) =>
             throw new NotImplementedException();
     }
-
+    
+    //Might use this later - @989onan
+    /*
     [HarmonyPatch(typeof(SystemInfoConnector))]
     public static class SystemInfoConnectorPatch
     {
@@ -448,24 +381,24 @@ namespace Thundaga
             typeof(SystemInfoConnector).GetProperty("FPS", AccessTools.all);
         public static PropertyInfo ImmediateFPS =
             typeof(SystemInfoConnector).GetProperty("ImmediateFPS", AccessTools.all);
-        [HarmonyPatch("ExternalUpdateTime", MethodType.Setter)]
         [HarmonyReversePatch]
+        [HarmonyPatch("ExternalUpdateTime", MethodType.Setter)]
         public static void set_ExternalUpdateTime(SystemInfoConnector instance, float value) =>
             throw new NotImplementedException();
 
-        [HarmonyPatch("RenderTime", MethodType.Setter)]
         [HarmonyReversePatch]
+        [HarmonyPatch("RenderTime", MethodType.Setter)]
         public static void set_RenderTime(SystemInfoConnector instance, float value) =>
             throw new NotImplementedException();
 
-        [HarmonyPatch("FPS", MethodType.Setter)]
         [HarmonyReversePatch]
+        [HarmonyPatch("FPS", MethodType.Setter)]
         public static void set_FPS(SystemInfoConnector instance, float value) =>
             throw new NotImplementedException();
 
-        [HarmonyPatch("ImmediateFPS", MethodType.Setter)]
         [HarmonyReversePatch]
+        [HarmonyPatch("ImmediateFPS", MethodType.Setter)]
         public static void set_ImmediateFPS(SystemInfoConnector instance, float value) =>
             throw new NotImplementedException();
-    }
+    }*/
 }

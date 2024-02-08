@@ -2,7 +2,7 @@ using System;
 using System.Reflection;
 using FrooxEngine;
 using HarmonyLib;
-using UnityNeos;
+using UnityFrooxEngineRunner;
 
 namespace Thundaga
 {
@@ -37,36 +37,35 @@ namespace Thundaga
 
         public WorldConnectorDestroyPacket(WorldConnector connector) => _connector = connector;
     }
-    [HarmonyPatch(typeof(WorldConnector))]
+    [HarmonyPatch]
     public class WorldConnectorPatch
     {
         public static FieldInfo Focus = typeof(World).GetField("_focus", AccessTools.all);
-        [HarmonyPatch("Initialize")]
-        [HarmonyReversePatch]
+        //[HarmonyReversePatch]
+        //[HarmonyPatch(typeof(WorldConnector), "Initialize")]
         public static void Initialize(WorldConnector instance, World owner) => throw new NotImplementedException();
-        [HarmonyPatch("ChangeFocus")]
-        [HarmonyReversePatch]
+        //[HarmonyReversePatch]
+        //[HarmonyPatch(typeof(WorldConnector), "ChangeFocus")]
         public static void ChangeFocus(WorldConnector instance, World.WorldFocus focus) => throw new NotImplementedException();
-        [HarmonyPatch("Destroy")]
-        [HarmonyReversePatch]
+        //[HarmonyReversePatch]
+        //[HarmonyPatch(typeof(WorldConnector), "Destroy")]
         public static void Destroy(WorldConnector instance) => throw new NotImplementedException();
-
-        [HarmonyPatch("Initialize")]
         [HarmonyPrefix]
+        [HarmonyPatch(typeof(WorldConnector), "Initialize")]
         public static bool InitializePatch(WorldConnector __instance, World owner)
         {
             PacketManager.EnqueueHigh(new WorldConnectorInitializePacket(__instance, owner));
             return false;
         }
-        [HarmonyPatch("ChangeFocus")]
         [HarmonyPrefix]
+        [HarmonyPatch(typeof(WorldConnector), "ChangeFocus")]
         public static bool ChangeFocusPatch(WorldConnector __instance, World.WorldFocus focus)
         {
             PacketManager.Enqueue(new WorldConnectorChangeFocusPacket(__instance, focus));
             return false;
         }
-        [HarmonyPatch("Destroy")]
         [HarmonyPrefix]
+        [HarmonyPatch(typeof(WorldConnector), "Destroy")]
         public static bool DestroyPatch(WorldConnector __instance)
         {
             PacketManager.Enqueue(new WorldConnectorDestroyPacket(__instance));
@@ -78,8 +77,8 @@ namespace Thundaga
     public class WorldPatch
     {
         public static int AutoRefreshTick;
-        [HarmonyPatch("UpdateUpdateTime")]
         [HarmonyPostfix]
+        [HarmonyPatch("UpdateUpdateTime", typeof(double))]
         public static void UpdateUpdateTime(World __instance, double time)
         {
             if (__instance.TotalUpdates == AutoRefreshTick) FrooxEngineRunnerPatch.ShouldRefreshAllConnectors = true;

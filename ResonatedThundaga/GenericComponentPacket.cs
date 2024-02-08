@@ -1,9 +1,12 @@
 using System;
 using System.Linq;
-using BaseX;
+using Elements.Core;
 using FrooxEngine;
 using Thundaga.Packets;
-using UnityNeos;
+using Thundaga;
+using UnityFrooxEngineRunner;
+using HarmonyLib;
+using System.Reflection;
 
 namespace Thundaga
 {
@@ -13,7 +16,6 @@ namespace Thundaga
         {
             if (_connector?.Owner != null) _connector.ApplyChanges();
         }
-
         public GenericComponentPacket(IConnector connector, bool refresh = false)
         {
             _connector = connector;
@@ -23,18 +25,16 @@ namespace Thundaga
                 //TODO: is this heavy on performance?
                 case MeshRendererConnector meshConnector:
                 {
-                    var owner = meshConnector.Owner;
-                    MeshRendererConnectorPatch.set_meshWasChanged(meshConnector,
-                        owner.Mesh.GetWasChangedAndClear());
-                    owner.SortingOrder.GetWasChangedAndClear();
-                    owner.ShadowCastMode.GetWasChangedAndClear();
-                    owner.MotionVectorMode.GetWasChangedAndClear();
-                    break;
+                        var owner = meshConnector.Owner;
+                        meshConnector.meshWasChanged = owner.Mesh.GetWasChangedAndClear();
+                        owner.SortingOrder.GetWasChangedAndClear();
+                        owner.ShadowCastMode.GetWasChangedAndClear();
+                        owner.MotionVectorMode.GetWasChangedAndClear();
+                        break;
                 }
                 case SkinnedMeshRendererConnector skinnedMeshRendererConnector:
                     var owner2 = skinnedMeshRendererConnector.Owner;
-                    SkinnedMeshRendererConnectorPatchB.set_meshWasChanged(skinnedMeshRendererConnector,
-                        owner2.Mesh.GetWasChangedAndClear());
+                    skinnedMeshRendererConnector.meshWasChanged = owner2.Mesh.GetWasChangedAndClear();
                     owner2.SortingOrder.GetWasChangedAndClear();
                     owner2.ShadowCastMode.GetWasChangedAndClear();
                     owner2.MotionVectorMode.GetWasChangedAndClear();
@@ -44,6 +44,7 @@ namespace Thundaga
             }
         }
     }
+
     public class GenericComponentDestroyPacket : ConnectorPacket<IConnector>
     {
         private bool _destroyingWorld;
