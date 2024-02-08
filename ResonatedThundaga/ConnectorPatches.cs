@@ -31,7 +31,7 @@ namespace Thundaga
 
 
     //Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the mesh renderer patch.
-    /*
+    
     [HarmonyPatch(typeof(MeshRendererConnectorBase<MeshRenderer, UnityEngine.MeshRenderer>))]
     public class MeshRendererConnectorPatch
     {
@@ -58,7 +58,7 @@ namespace Thundaga
             var codes = new List<CodeInstruction>(instructions);
             codes.Reverse();
             
-            for (var i = 0; i < codes.Count; i++)
+            /*for (var i = 0; i < codes.Count; i++)
             {
                 //this makes more sense, since instead of looking for the op code, look for the operand calling GetWasChangedAndClear and remove and and surrounding till it doesn't cause errors.
                 //- @989onan
@@ -71,11 +71,11 @@ namespace Thundaga
                     code.operand = null;
                 }
                     
-            }
+            }*/
 
 
             //get rid of renderer enabled to prevent thread errors.
-            for (var i = 0; i < codes.Count; i++){
+            /*for (var i = 0; i < codes.Count; i++){
                 if (codes[i].opcode != OpCodes.Callvirt || !codes[i].operand.ToString().Contains("Renderer::set_Enabled")) continue;
 
                 for(var h = 0; h< 5; h++)
@@ -86,7 +86,7 @@ namespace Thundaga
 
                 }
 
-            }
+            }*/
 
             //get rid of setting mesh was changed to prevent thread errors? 
             for (var i = 0; i < codes.Count; i++)
@@ -94,6 +94,7 @@ namespace Thundaga
                 if (codes[i].opcode != OpCodes.Call || !codes[i].operand.ToString().Contains("set_meshWasChanged")) continue;
                 for (var h = 0; h < 9; h++)
                 {
+                    
                     var code = codes[i + h];
                     code.opcode = OpCodes.Nop;
                     code.operand = null;
@@ -107,13 +108,28 @@ namespace Thundaga
             //replace generic set with our method - Fro Zen
             //this 
 
-            var index = codes.IndexOf(codes.Where(i =>
+            /*var index = codes.IndexOf(codes.Where(i =>
                 i.opcode == OpCodes.Callvirt && i.operand.ToString().Contains("AddComponent")).ToList()[1]);
             codes[index].operand = typeof(MeshGenericFix).GetMethod("SetMeshRendererPatch");
             codes[index].opcode = OpCodes.Call;
-            codes.Insert(index, new CodeInstruction(OpCodes.Ldarg_0));
+            codes.Insert(index, new CodeInstruction(OpCodes.Ldarg_0));*/
             Thundaga.Msg("Patched Mesh renderer connector.");
 
+            Thundaga.Msg("Patch new codes");
+            foreach (CodeInstruction code1 in codes)
+            {
+                Thundaga.Msg(code1.opcode.ToString());
+                try
+                {
+                    Thundaga.Msg(code1.operand.ToString());
+                }
+                catch
+                {
+                    
+                    Thundaga.Msg("failed to print operand");
+                }
+
+            }
             return codes;
         }
 
@@ -230,7 +246,7 @@ namespace Thundaga
 
             return transpilerCodeMeshConnectorGeneric.ApplyChangesTranspilerGeneric(instructions);
         }
-    }*/
+    }
     [HarmonyPatch]
     public static class MeshConnectorPatch
     {
