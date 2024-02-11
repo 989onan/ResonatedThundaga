@@ -30,22 +30,152 @@ namespace Thundaga
 
 
 
-    //Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the mesh renderer patch.
-    
+    //
+    /// <summary>
+    /// Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the mesh renderer patch.
+    /// here we copied the code verbatim, and changed out this and base with __instance as would be done with harmony
+    /// next, we patch out the methods that cause issues, like destroy immediates, adding components, and GetWasChangedAndClear().
+    /// lastly we prevent the original method from running at any point.
+    /// this is basically a transpiler but much worsely coded.
+    /// </summary>
+
     [HarmonyPatch(typeof(MeshRendererConnectorBase<MeshRenderer, UnityEngine.MeshRenderer>))]
     public class MeshRendererConnectorPatch
     {
         [HarmonyPatch("ApplyChanges")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
-            IEnumerable<CodeInstruction> instructions)
+        [HarmonyPrefix]
+        public static bool ApplyChangesTranspiler(
+            MeshRendererConnectorBase<MeshRenderer, UnityEngine.MeshRenderer> __instance)
         {
-
-            Thundaga.Msg("patching MeshRendererConnectorBase for SkinnedMeshRendererConnector implementation");
-
-            return transpilerCodeMeshConnectorGeneric.ApplyChangesTranspilerGeneric(instructions);
-
-
+            Thundaga.Msg("pushing buffer for message");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("trying to run a mesh renderer connector patch");
+            Thundaga.Msg("finished pushing buffer");
+            if (!__instance.Owner.ShouldBeEnabled)
+            {
+                __instance.CleanupRenderer(false);
+                return false ;
+            }
+            bool flag = false;
+            if (__instance.MeshRenderer == null)
+            {
+                GameObject gameObject = new GameObject("");
+                gameObject.transform.SetParent(__instance.attachedGameObject.transform, false);
+                gameObject.layer = __instance.attachedGameObject.layer;
+                if (__instance.UseMeshFilter)
+                {
+                    __instance.meshFilter = gameObject.AddComponent<MeshFilter>();
+                }
+                __instance.MeshRenderer = (UnityEngine.MeshRenderer)MeshGenericFix.SetMeshRendererPatch(gameObject, __instance);
+                __instance.OnAttachRenderer();
+                flag = true;
+            }
+            if (__instance.meshWasChanged)
+            {
+                UnityEngine.Mesh unity = __instance.Owner.Mesh.Asset.GetUnity();
+                if (__instance.UseMeshFilter)
+                {
+                    __instance.meshFilter.sharedMesh = unity;
+                }
+                else
+                {
+                    __instance.AssignMesh(__instance.MeshRenderer, unity);
+                }
+            }
+            bool flag2 = false;
+            if (__instance.Owner.MaterialsChanged || __instance.meshWasChanged)
+            {
+                __instance.Owner.MaterialsChanged = false;
+                flag2 = true;
+                __instance.materialCount = 1;
+                UnityEngine.Material material = __instance.Owner.IsLocalElement ? MaterialConnector.InvisibleMaterial : MaterialConnector.NullMaterial;
+                if (__instance.Owner.Materials.Count > 1 || __instance.unityMaterials != null)
+                {
+                    __instance.unityMaterials = __instance.unityMaterials.EnsureExactSize(__instance.Owner.Materials.Count, false, true);
+                    for (int i = 0; i < __instance.unityMaterials.Length; i++)
+                    {
+                        UnityEngine.Material[] array = __instance.unityMaterials;
+                        int num = i;
+                        IAssetProvider<FrooxEngine.Material> assetProvider = __instance.Owner.Materials[i];
+                        array[num] = ((assetProvider != null) ? assetProvider.Asset.GetUnity(material) : null);
+                    }
+                    __instance.MeshRenderer.sharedMaterials = __instance.unityMaterials;
+                    __instance.materialCount = __instance.unityMaterials.Length;
+                }
+                else if (__instance.Owner.Materials.Count == 1)
+                {
+                    Renderer renderer = __instance.MeshRenderer;
+                    AssetRef<FrooxEngine.Material> material2 = __instance.Owner.Material;
+                    renderer.sharedMaterial = ((material2 != null) ? material2.Asset.GetUnity(material) : null);
+                }
+                else
+                {
+                    __instance.MeshRenderer.sharedMaterial = material;
+                }
+            }
+            if (__instance.Owner.MaterialPropertyBlocksChanged || flag2)
+            {
+                __instance.Owner.MaterialPropertyBlocksChanged = false;
+                if (__instance.Owner.MaterialPropertyBlocks.Count > 0)
+                {
+                    for (int j = 0; j < __instance.materialCount; j++)
+                    {
+                        if (j < __instance.Owner.MaterialPropertyBlocks.Count)
+                        {
+                            Renderer renderer2 = __instance.MeshRenderer;
+                            IAssetProvider<FrooxEngine.MaterialPropertyBlock> assetProvider2 = __instance.Owner.MaterialPropertyBlocks[j];
+                            renderer2.SetPropertyBlock((assetProvider2 != null) ? assetProvider2.Asset.GetUnity() : null, j);
+                        }
+                        else
+                        {
+                            __instance.MeshRenderer.SetPropertyBlock(null, j);
+                        }
+                    }
+                    __instance.usesMaterialPropertyBlocks = true;
+                }
+                else if (__instance.usesMaterialPropertyBlocks)
+                {
+                    for (int k = 0; k < __instance.materialCount; k++)
+                    {
+                        __instance.MeshRenderer.SetPropertyBlock(null, k);
+                    }
+                    __instance.usesMaterialPropertyBlocks = false;
+                }
+            }
+            //prevent from running this from original method.
+            /*
+            bool enabled = __instance.Owner.Enabled;
+            if (__instance.MeshRenderer.enabled != enabled)
+            {
+                __instance.MeshRenderer.enabled = enabled;
+            }
+            if (__instance.Owner.SortingOrder.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.sortingOrder = __instance.Owner.SortingOrder.Value;
+            }
+            if (__instance.Owner.ShadowCastMode.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.shadowCastingMode = __instance.Owner.ShadowCastMode.Value.ToUnity();
+            }
+            if (__instance.Owner.MotionVectorMode.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.motionVectorGenerationMode = __instance.Owner.MotionVectorMode.Value.ToUnity();
+            }*/
+            __instance.OnUpdateRenderer(flag);
+            return false;
         }
     }
 
@@ -145,12 +275,130 @@ namespace Thundaga
             return gameObject.AddComponent<UnityEngine.SkinnedMeshRenderer>();
         }
     }
-    [HarmonyPatch(typeof(SkinnedMeshRendererConnector))]
+
+
+
+
+    [HarmonyPatch]
     public static class SkinnedMeshRendererConnectorPatchA
     {
-        [HarmonyPatch("OnUpdateRenderer")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
+        [HarmonyPatch(typeof(SkinnedMeshRendererConnector), "OnUpdateRenderer", typeof(bool))]
+        [HarmonyReversePatch]
+        public static bool OnUpdateRendererPatch(SkinnedMeshRendererConnector __instance, bool instantiated)
+        {
+            SkinnedBounds skinnedBounds = __instance.Owner.BoundsComputeMethod.Value;
+            if (skinnedBounds == SkinnedBounds.Static && __instance.Owner.Slot.ActiveUserRoot == __instance.Owner.LocalUserRoot)
+            {
+                skinnedBounds = SkinnedBounds.FastDisjointRootApproximate;
+            }
+
+            if (__instance.meshWasChanged || __instance._currentBoundsMethod != skinnedBounds || __instance.Owner.ProxyBoundsSource.WasChanged || __instance.Owner.ExplicitLocalBounds.WasChanged)
+            {
+                __instance.Owner.ProxyBoundsSource.WasChanged = false;
+                __instance.Owner.ExplicitLocalBounds.WasChanged = false;
+                if (skinnedBounds != 0 && skinnedBounds != SkinnedBounds.Proxy && skinnedBounds != SkinnedBounds.Explicit)
+                {
+                    if (__instance._boundsUpdater == null)
+                    {
+                        __instance.LocalBoundingBoxAvailable = false;
+                        __instance._boundsUpdater = __instance.MeshRenderer.gameObject.AddComponent<SkinBoundsUpdater>();
+                        __instance._boundsUpdater.connector = __instance;
+                    }
+
+                    __instance._boundsUpdater.boundsMethod = skinnedBounds;
+                    __instance._boundsUpdater.boneMetadata = __instance.Owner.Mesh.Asset.BoneMetadata;
+                    __instance._boundsUpdater.approximateBounds = __instance.Owner.Mesh.Asset.ApproximateBoneBounds;
+                    __instance.MeshRenderer.updateWhenOffscreen = skinnedBounds == SkinnedBounds.SlowRealtimeAccurate;
+                }
+                else
+                {
+                    if (__instance._boundsUpdater != null)
+                    {
+                        __instance.LocalBoundingBoxAvailable = false;
+                        __instance.MeshRenderer.updateWhenOffscreen = false;
+                        __instance.CleanupBoundsUpdater();
+                    }
+
+                    //if (skinnedBounds == SkinnedBounds.Proxy)
+                    //{
+                    //    __instance.CleanupProxy();
+                    //    __instance._proxySource = __instance.Owner.ProxyBoundsSource.Target?.SkinConnector as SkinnedMeshRendererConnector;
+                    //    if (__instance._proxySource != null)
+                    //    {
+                    //        __instance._proxySource.BoundsUpdated += __instance.ProxyBoundsUpdated;
+                    //        __instance.ProxyBoundsUpdated();
+                    //    }
+                    //}
+
+                    if (skinnedBounds == SkinnedBounds.Explicit)
+                    {
+                        __instance.MeshRenderer.localBounds = __instance.Owner.ExplicitLocalBounds.Value.ToUnity();
+                        __instance.LocalBoundingBoxAvailable = true;
+                        __instance.SendBoundsUpdated();
+                    }
+                }
+
+                __instance._currentBoundsMethod = skinnedBounds;
+            }
+
+            bool flag = __instance.meshWasChanged;
+            bool bonesChanged = __instance.Owner.BonesChanged;
+            bool blendShapeWeightsChanged = __instance.Owner.BlendShapeWeightsChanged;
+            bool num = bonesChanged || flag;
+            blendShapeWeightsChanged = blendShapeWeightsChanged || flag;
+            if (num)
+            {
+                __instance.Owner.BonesChanged = false;
+                int? num2 = __instance.Owner.Mesh.Asset?.Data?.BoneCount;
+                int? num3 = __instance.Owner.Mesh.Asset?.Data?.BlendShapeCount;
+                bool flag2 = num2 == 0 && num3 > 0;
+                if (flag2)
+                {
+                    num2 = 1;
+                }
+
+                __instance.bones = __instance.bones.EnsureExactSize(num2.GetValueOrDefault());
+                if (__instance.bones != null)
+                {
+                    if (flag2)
+                    {
+                        __instance.bones[0] = __instance.attachedGameObject.transform;
+                    }
+                    else
+                    {
+                        int num4 = MathX.Min(__instance.bones.Length, __instance.Owner.Bones.Count);
+                        int num5 = 0;
+                        for (int i = 0; i < num4; i++)
+                        {
+                            SlotConnector slotConnector = __instance.Owner.Bones[i]?.Connector as SlotConnector;
+                            if (slotConnector != null)
+                            {
+                                __instance.bones[i] = slotConnector.ForceGetGameObject().transform;
+                                num5++;
+                            }
+                        }
+                    }
+                }
+
+                __instance.MeshRenderer.bones = __instance.bones;
+                __instance.MeshRenderer.rootBone = (flag2 ? __instance.attachedGameObject.transform : (__instance.Owner.GetRootBone()?.Connector as SlotConnector)?.ForceGetGameObject().transform);
+            }
+
+            if (blendShapeWeightsChanged)
+            {
+                DoBlendShapes(__instance);
+            }
+
+            if (__instance._forceRecalcPerRender)
+            {
+                __instance.MeshRenderer.forceMatrixRecalculationPerRender = true;
+            }
+
+            __instance.SendBoundsUpdated();
+
+            return false;
+        }
+        /*public static IEnumerable<CodeInstruction> ApplyChangesTranspiler(
             IEnumerable<CodeInstruction> instructions)
         {
             //remove WasChanged set to prevent thread errors
@@ -204,7 +452,7 @@ namespace Thundaga
             
             Thundaga.Msg("patched SkinnedMeshRendererConnector");
             return codes;
-        }
+        }*/
 
         public static int GetBlendShapeCount(ref SkinnedMeshRendererConnector __instance) => __instance.MeshRenderer.sharedMesh.blendShapeCount;
         public static bool DoBlendShapes(SkinnedMeshRendererConnector instance)
@@ -234,17 +482,141 @@ namespace Thundaga
 
     //Patching generics is a pain, so we patch skinned and normal mesh renderers. this is the skinned mesh renderer patch.
     [HarmonyPatch(typeof(MeshRendererConnectorBase<SkinnedMeshRenderer, UnityEngine.SkinnedMeshRenderer>))]
-    public static class SkinnedMeshRendererConnectorPatchB
+    public class SkinnedMeshRendererConnectorPatch
     {
         [HarmonyPatch("ApplyChanges")]
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> OnUpdateRendererTranspiler(
-            IEnumerable<CodeInstruction> instructions)
-        {
+        [HarmonyPrefix]
+        public static bool ApplyChanges(MeshRendererConnectorBase<MeshRenderer, UnityEngine.SkinnedMeshRenderer> __instance){
+            Thundaga.Msg("pushing buffer for message");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("trying to run a Skinned mesh renderer connector patch");
+            Thundaga.Msg("finished pushing buffer");
+            if (!__instance.Owner.ShouldBeEnabled)
+            {
+                __instance.CleanupRenderer(false);
+                return false;
+            }
+            bool flag = false;
+            if (__instance.MeshRenderer == null)
+            {
+                GameObject gameObject = new GameObject("");
+                gameObject.transform.SetParent(__instance.attachedGameObject.transform, false);
+                gameObject.layer = __instance.attachedGameObject.layer;
+                if (__instance.UseMeshFilter)
+                {
+                    __instance.meshFilter = gameObject.AddComponent<MeshFilter>();
+                }
+                __instance.MeshRenderer = (UnityEngine.SkinnedMeshRenderer)MeshGenericFix.SetMeshRendererPatch(gameObject, __instance);
+                __instance.OnAttachRenderer();
+                flag = true;
+            }
 
-            Thundaga.Msg("patching MeshRendererConnectorBase for SkinnedMeshRendererConnector implementation");
-
-            return transpilerCodeMeshConnectorGeneric.ApplyChangesTranspilerGeneric(instructions);
+            if (__instance.meshWasChanged)
+            {
+                UnityEngine.Mesh unity = __instance.Owner.Mesh.Asset.GetUnity();
+                if (__instance.UseMeshFilter)
+                {
+                    __instance.meshFilter.sharedMesh = unity;
+                }
+                else
+                {
+                    __instance.AssignMesh(__instance.MeshRenderer, unity);
+                }
+            }
+            bool flag2 = false;
+            if (__instance.Owner.MaterialsChanged || __instance.meshWasChanged)
+            {
+                __instance.Owner.MaterialsChanged = false;
+                flag2 = true;
+                __instance.materialCount = 1;
+                UnityEngine.Material material = __instance.Owner.IsLocalElement ? MaterialConnector.InvisibleMaterial : MaterialConnector.NullMaterial;
+                if (__instance.Owner.Materials.Count > 1 || __instance.unityMaterials != null)
+                {
+                    __instance.unityMaterials = __instance.unityMaterials.EnsureExactSize(__instance.Owner.Materials.Count, false, true);
+                    for (int i = 0; i < __instance.unityMaterials.Length; i++)
+                    {
+                        UnityEngine.Material[] array = __instance.unityMaterials;
+                        int num = i;
+                        IAssetProvider<FrooxEngine.Material> assetProvider = __instance.Owner.Materials[i];
+                        array[num] = ((assetProvider != null) ? assetProvider.Asset.GetUnity(material) : null);
+                    }
+                    __instance.MeshRenderer.sharedMaterials = __instance.unityMaterials;
+                    __instance.materialCount = __instance.unityMaterials.Length;
+                }
+                else if (__instance.Owner.Materials.Count == 1)
+                {
+                    Renderer renderer = __instance.MeshRenderer;
+                    AssetRef<FrooxEngine.Material> material2 = __instance.Owner.Material;
+                    renderer.sharedMaterial = ((material2 != null) ? material2.Asset.GetUnity(material) : null);
+                }
+                else
+                {
+                    __instance.MeshRenderer.sharedMaterial = material;
+                }
+            }
+            if (__instance.Owner.MaterialPropertyBlocksChanged || flag2)
+            {
+                __instance.Owner.MaterialPropertyBlocksChanged = false;
+                if (__instance.Owner.MaterialPropertyBlocks.Count > 0)
+                {
+                    for (int j = 0; j < __instance.materialCount; j++)
+                    {
+                        if (j < __instance.Owner.MaterialPropertyBlocks.Count)
+                        {
+                            Renderer renderer2 = __instance.MeshRenderer;
+                            IAssetProvider<FrooxEngine.MaterialPropertyBlock> assetProvider2 = __instance.Owner.MaterialPropertyBlocks[j];
+                            renderer2.SetPropertyBlock((assetProvider2 != null) ? assetProvider2.Asset.GetUnity() : null, j);
+                        }
+                        else
+                        {
+                            __instance.MeshRenderer.SetPropertyBlock(null, j);
+                        }
+                    }
+                    __instance.usesMaterialPropertyBlocks = true;
+                }
+                else if (__instance.usesMaterialPropertyBlocks)
+                {
+                    for (int k = 0; k < __instance.materialCount; k++)
+                    {
+                        __instance.MeshRenderer.SetPropertyBlock(null, k);
+                    }
+                    __instance.usesMaterialPropertyBlocks = false;
+                }
+            }
+            //prevent from running this from original method.
+            /*
+            bool enabled = __instance.Owner.Enabled;
+            if (__instance.MeshRenderer.enabled != enabled)
+            {
+                __instance.MeshRenderer.enabled = enabled;
+            }
+            if (__instance.Owner.SortingOrder.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.sortingOrder = __instance.Owner.SortingOrder.Value;
+            }
+            if (__instance.Owner.ShadowCastMode.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.shadowCastingMode = __instance.Owner.ShadowCastMode.Value.ToUnity();
+            }
+            if (__instance.Owner.MotionVectorMode.GetWasChangedAndClear() || flag)
+            {
+                __instance.MeshRenderer.motionVectorGenerationMode = __instance.Owner.MotionVectorMode.Value.ToUnity();
+            }*/
+            __instance.OnUpdateRenderer(flag);
+            return false;
         }
     }
     [HarmonyPatch]
